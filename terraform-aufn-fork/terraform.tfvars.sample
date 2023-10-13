@@ -1,0 +1,4 @@
+lab_count     = 6
+lab_net_ipv4  = "stackhpc-ipv4-vlan-v2"
+lab_prefix    = "stackhpc"
+image_id      = "set_me"
