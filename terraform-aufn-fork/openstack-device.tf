@@ -58,7 +58,7 @@ resource "openstack_compute_instance_v2" "registry" {
   name            = "${var.lab_prefix}-registry"
   flavor_name     = "medium"
   key_pair        = openstack_compute_keypair_v2.ufn_lab_key.name
-  security_groups = ["default"]
+  security_groups = ["systems-ssh"]
 
   block_device {
     uuid                  = var.image_id
@@ -87,14 +87,15 @@ resource "openstack_compute_floatingip_associate_v2" "registry" {
 
 resource "null_resource" "registry" {
   connection {
+    type                = "ssh"
     bastion_user        = var.create_bastion ? var.image_user : null
     bastion_private_key = var.create_bastion ? tls_private_key.default.private_key_pem : null
     bastion_host        = var.create_bastion ? openstack_compute_floatingip_associate_v2.bastion[0].floating_ip : null
     user                = var.image_user
-    private_key         = tls_private_key.default.private_key_pem
+    private_key = tls_private_key.default.private_key_pem
     agent               = false
     timeout             = "300s"
-    host                = var.allocate_floating_ips ? openstack_compute_floatingip_associate_v2.registry[0].floating_ip : openstack_compute_instance_v2.registry.network.0.fixed_ip_v4
+    host                = var.allocate_floating_ips  ? openstack_compute_floatingip_associate_v2.registry[0].floating_ip : openstack_compute_instance_v2.registry.network.0.fixed_ip_v4
   }
 
   triggers = {
@@ -161,6 +162,7 @@ resource "null_resource" "lab" {
   count = var.lab_count
 
   connection {
+    type                = "ssh"
     bastion_user        = var.create_bastion ? var.image_user : null
     bastion_private_key = var.create_bastion ? tls_private_key.default.private_key_pem : null
     bastion_host        = var.create_bastion ? openstack_compute_floatingip_associate_v2.bastion[0].floating_ip : null
@@ -168,7 +170,7 @@ resource "null_resource" "lab" {
     private_key         = tls_private_key.default.private_key_pem
     agent               = false
     timeout            = "300s"
-    host                = var.allocate_floating_ips ? openstack_compute_floatingip_associate_v2.lab[count.index].floating_ip : openstack_compute_instance_v2.lab[count.index].network.0.fixed_ip_v4
+    host                = var.allocate_floating_ips  ? openstack_compute_floatingip_associate_v2.lab[count.index].floating_ip : openstack_compute_instance_v2.lab[count.index].network.0.fixed_ip_v4
   }
 
   triggers = {
@@ -176,10 +178,16 @@ resource "null_resource" "lab" {
     host_id     = openstack_compute_instance_v2.lab[count.index].id
     mtu         = 1500
   }
-
   provisioner "remote-exec" {
     script = "setup-user.sh"
   }
+  
+  #provisioner "file"{
+
+  #source = "setup-user.sh"
+  #destination = "/tmp/setup-user.sh"
+
+#}
 
   provisioner "file" {
     source      = "a-seed-from-nothing.sh"
@@ -196,7 +204,7 @@ resource "null_resource" "lab" {
       "sudo install /tmp/a-seed-from-nothing.sh /home/lab",
       "sudo install /tmp/a-universe-from-seed.sh /home/lab",
       "sudo usermod -p `echo ${self.triggers.host_id} | openssl passwd -1 -stdin` lab",
-      "sudo -u lab /home/lab/a-seed-from-nothing.sh ${self.triggers.registry_ip} | sudo -u lab tee -a /home/lab/a-seed-from-nothing.out",
+     "sudo -u lab /home/lab/a-seed-from-nothing.sh ${self.triggers.registry_ip} | sudo -u lab tee -a /home/lab/a-seed-from-nothing.out",
     ]
   }
 }
